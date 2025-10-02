@@ -119,7 +119,7 @@ def assemble_stiffnes_mat(el_conn, node_info, D_mat):
             dof_map.append(dof_u)
             dof_map.append(dof_v)
             
-            K[ix_(dof_map), ix_(dof_map)] += K_e
+        K[ix_(dof_map, dof_map)] += K_e
     return K
 
 def comp_fint(n_nodes, coords, u_e, D_mat):
