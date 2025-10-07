@@ -1,0 +1,9 @@
+[5 October 2025]
+
+[Nok] learn GMSH and create mesh --> specimen files for numerical examples for 	brittle fracture PFM implentation 
+
+[Nok] update the method > def save_my_results()
+
+[Nok] create a method > def read_saved_results()
+
+[Nok] 
