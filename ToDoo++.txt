@@ -1,9 +1,17 @@
 [5 October 2025]
 
-[Nok] learn GMSH and create mesh --> specimen files for numerical examples for 	brittle fracture PFM implementation 
+[OK] update the method > def save_my_results()
 
-[Nok] update the method > def save_my_results()
+-----------------------------------------------------
 
-[Nok] create a method > def read_saved_results()
+[8 October 2025]
 
-[Nok] 
+[Nok] learn GMSH and create mesh --> specimen files for numerical examples for 	brittle fracture PFM implementation
+        already two practice specimen files are saved 
+
+[Nok] still needs to saparate the Pre_processing data into specimen_files
+
+[Nok] create py_file that reads data from saved results and plots accordingly
+
+[Nok] update get_gpt_coords at the beginning of code where mesh is read
+        
