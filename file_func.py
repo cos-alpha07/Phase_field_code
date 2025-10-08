@@ -13,10 +13,9 @@ Created on Tue Aug 12 17:03:19 2025
 """
 #%% [IMPORTS]
 from math import sqrt
-from numpy import array, zeros, ix_, dot, asarray, empty, max
+from numpy import array, zeros, ix_, dot, asarray, empty, max, arange
 from scipy.linalg import det, inv, norm
-import time
-import pickle
+import time, pickle, os
 
 
 #%% [FE functions]
@@ -185,3 +184,67 @@ def check_convergence(error, tol):
     if error < tol:
         cnvg = True
     return cnvg
+
+def get_gpts_crds(coords):
+    for row in el_conn:
+        cl_conn = [nd for nd in get_conn(row[0], el_conn) if nd != 0]
+        coords =  asarray([get_node_coord(n, node_info) for n in cl_conn], dtype=float)
+        n_nodes_elem = len(cl_conn)
+    
+    
+
+
+#%% Utilty functions
+
+def save_my_results(U, Phi, his_par, srmat, tsmat, fname):
+    folder = fname
+    
+    # if directory doesnot exists:
+        # make directory
+    os.makedirs(folder, exist_ok=True)
+    
+    data_obj = {f'displacement data at step-{len(tsmat)}': U,
+            f'PF variable data at step-{len(tsmat)}': Phi,
+            f'History parameter variable at step-{len(tsmat)}': his_par,
+            f'SR data at step-{len(tsmat)}': srmat,
+            f'TS data at step-{len(tsmat)}': tsmat}
+    
+    for filename, data in data_obj.items():
+        file_path = os.path.join(folder, f'{filename}.pkl')
+        pickle.dump(data, open(file_path, 'wb'))
+
+def get_gmsh_data(file_name, dim=2):
+    nd_data = []
+    el_data = []
+    nd_idxs = []
+    el_idxs = []
+
+    with open(file_name, 'r') as file:
+        line = file.readlines()
+        file.close()
+
+    # reading node data
+    for i, l in enumerate(line):
+        if '*NODE' in l:
+            nd_idxs.append(i+1)
+        elif '*ELEMENT' in l:
+            nd_idxs.append(i-1)
+            break
+
+    for l in line[nd_idxs[0]:nd_idxs[1]]:
+        nd_data.append(l.split(', '))
+    nd_data = array(nd_data, dtype=float)
+
+    # reading element data
+    for i, l in enumerate(line):
+        if 'ELSET=Surface1' in l:
+            el_idxs.append(i+1)
+
+    for l in line[el_idxs[0]:]:
+        if l.startswith('*'):
+            break
+        el_data.append(l.split(', '))
+    el_data = array(el_data, dtype=int)
+    el_data[:, 0] = arange(1, len(el_data)+1, 1, dtype=int)
+
+    return el_data, nd_data[:, 0:dim+1], len(el_data), len(nd_data)
