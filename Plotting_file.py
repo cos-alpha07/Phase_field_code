@@ -6,12 +6,8 @@ Created on Tue Sep 23 12:25:12 2025
 """
 
 #%% [IMPORTS]
-import matplotlib.pyplot as plt
-import scienceplots
-from numpy import linspace
 from file_func import *
-
-plt.style.use(['science', 'ieee', 'high-vis', 'no-latex'])
+from impLibrary import *
 
 #%% [Contour and Mesh Plots]
 def plot_contour(**kwargs):
@@ -35,7 +31,7 @@ def plot_contour(**kwargs):
         
         # CYX system
         if crds is None:
-            raise ValueError('coordinate system undefiuned')
+            raise ValueError('coordinate system undefined')
         else:
             t = tri.Triangulation(crds[:,1], crds[:,2])
         
@@ -71,23 +67,23 @@ def plot_mesh(el_data, nd_data, **kwargs):
     show_elems = kwargs.get('show_elems', None)
     show_crack = kwargs.get('show_crack', None)
     show_bcs = kwargs.get('show_bcs', None)
+            
+    list = []
+    for row in el_data:
+        conn = get_conn(row[0], el_data)
+        cl_conn = [nd for nd in conn if nd != 0]        
+        coords =  [get_node_coord(n, nd_data) for n in cl_conn]
+        res =  [tuple(row) for row in coords]
+        list.append(res)
     
-    x, y = [], []
-    for i in range(1, len(el_data)+1):
-        conn = [_ for _ in get_conn(i, el_data) if _ != 0]
-        conn.append(conn[0])
-        for nd in conn:
-            crd = get_node_coord(nd, nd_data)
-            x.append(crd[0]), y.append(crd[1])
+    poly_collection = PolyCollection(list, facecolors='white', lw=0.2, edgecolors='blue', alpha=1)
+    fig, ax = plt.subplots()
+    ax.add_collection(poly_collection)
 
-    fig, ax  = plt.subplots()
+    # Set limits 
     ax.axis('off')
-
-    ax.set_xlim(-max(x)*1.5, max(x)*1.5)
-    ax.set_ylim(-max(y)*1.5, max(y)*1.5)
-
-    ax.set_title(f'No. of Elements {len(el_data)}, No. of Nodes {len(nd_data)}')
-    ax.fill(x, y, color='b', lw=0.2, fill=False)    
+    ax.autoscale()
+    ax.set_title(f'No. of Elements {len(el_data)}, No. of Nodes {len(nd_data)}')    
     
     if show_nodes:
         # display node number
@@ -150,7 +146,7 @@ def plot_structural_response(srmat, **kwargs):
         ax.set_ylabel(f'Load [N]')
         
     # plot
-    ax.plot(srmat[:, 0], srmat[:, 1], ls='-', c='black', lw=1, label='current')
+    ax.plot(srmat[:, 0], srmat[:, 1], ls='-', c='black', lw=1)
     
     # legend
     ax.legend()
