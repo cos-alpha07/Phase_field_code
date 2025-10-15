@@ -1,7 +1,53 @@
+# from specFiles.MODE1_2D import fill_set_data, load_max, Dim, bc_data
+# from Plotting_file import plot_contour, plot_mesh
+# import pickle, os
+
+# # %% pickle reading from save_file_location
+# fsd = r'E:\Codes_GitSync\results'
+# prob_name = '26-09-2025__quasi-static, standard_UALCNP_VICH__UNIBAR_redXS_2D__lc=10__smth=1'
+
+# ref_loc = r'E:\Codes_GitSync\validation_data\unibar\redXS\actual_redXS.csv'
+# file_path1 = fr'{fsd}\{prob_name}\Mesh\Step-data.pkl'
+# file_path2 = fr'{fsd}\{prob_name}\data.pkl'
+
+# if os.path.exists(fr'{fsd}\prob_name\Mesh'):
+#     with open(file_path1, 'rb') as f:
+#         loaded_variables1 = pickle.load(f)
+#         f.close()
+#     globals().update(loaded_variables1)
+
+# with open(file_path2, 'rb') as f:
+#     loaded_variables2 = pickle.load(f)
+#     f.close()
+# globals().update(loaded_variables2)
+
+
+# #%% PLOTTING
+# # mesh
+# # show_mesh(elem_df.values, node_df.values, Dim, show_bcs=True, bcs=bc_data)
+
+# # displacement contour
+# plot_contour(plot_this=u1[u1.columns[-1]].values, plot_on='nodes', plot_what='U1', dim=Dim, el_data=elem_df.values,
+#              nd_data=node_df.values)
+# plot_contour(plot_this=u2[u2.columns[-1]].values, plot_on='nodes', plot_what='U2', dim=Dim, el_data=elem_df.values,
+#              nd_data=node_df.values)
+
+# # damage contour
+# plot_contour(plot_this=dmg[dmg.columns[-1]].values, plot_on='nodes', plot_what='PHI', dim=Dim, el_data=elem_df.values,
+#              nd_data=node_df.values)
+
+# # Structural response / TSM
+# # kwargs for saving plots -> save_loc=fr'{fsd}/{prob_name}', sname
+
+# plot(SR=SR_df, xunit='mm', yunit='N', compare_sr=False, ref_loc=ref_loc, annotate_data=True)
+
+# plot(TSM=TSMat_df)
+# plot(SH=stepHistory)
+
+from numpy import asarray, array, append
 from file_func import *
-import matplotlib.pyplot as plt
-import matplotlib.tri as tri
-from numpy import array, asarray, linspace
+
+
 
 elem_mat = array([[1, 1, 2, 3, 4],
                   [2, 4, 3, 5, 0]], dtype=int)
@@ -12,63 +58,18 @@ node_mat = array([[1, 0, 0],
                   [4, 0, 1],
                   [5, 0.5, 2]], dtype=float)
 
-crack_set = array([1, 2])
-fill_set1 = array([2,4,5])
-fill_set_data = [crack_set, fill_set1]
 
-velocity = array([1, 2, -1, 3, 0.2])
-
-
-
-def plot_contour(**kwargs ):
-    # use kwargs for user input 
-    plot_this = kwargs.get('plot_this', None)   # vector value
-    plot_on = kwargs.get('plot_on', None)   # character value
-    crds = kwargs.get('crds', None)         # tensor value
-    text_TT = kwargs.get('title', None)     # character value
-    stpNum = kwargs.get('stpNum', None)     # Integer value
-    fill_data = kwargs.get('fill_data', None)   # tensor data
-    
-    
-    if plot_this is None:
-        raise ValueError('No value to plot')
-    else:
+def get_gpts_crds(nd_mat, el_conn):
+    gpt_crds = empty([0, 2])
+    for row in el_conn:
+        cl_conn = [nd for nd in get_conn(row[0], el_conn) if nd != 0]
+        coords =  asarray([get_node_coord(n, nd_mat) for n in cl_conn], dtype=float)
+        n_nodes_elem = len(cl_conn)
+        int_pts, loc, wts = get_el_type(n_nodes_elem)
+        for i in range(int_pts):
+            xi, eta  = loc[i, :]
+            N, dN = get_shape_functions(n_nodes_elem, xi, eta)
+            gpt_crds = append(gpt_crds, [N @ coords], axis=0)
+    return gpt_crds
         
-        # plot variable
-        if plot_on is not None and plot_on.upper() in ('NODES', 'NODE'):
-            print('Nodal plot')
-        elif plot_on is not None and plot_on.upper() in ('GPTS', 'GPT', 'GAUSSPOINT'):
-            print('Gaussian plot')
-        
-        # CYX system
-        if crds is None:
-            raise ValueError('coordinate system undefiuned')
-        else:
-            t = tri.Triangulation(crds[:,1], crds[:,2])
-        
-        # plot begins here
-        fig, ax = plt.subplots()
-        ax.axis('off')
-        
-        # Fill sets
-        if fill_data is not None:
-            # filling crack
-            crck_x = [get_node_coord(i, crds)[0] for i in fill_data[0]]
-            crck_y = [get_node_coord(i, crds)[1] for i in fill_data[0]]
-            
-            ax.fill(crck_x, crck_y, fill=True, color='white', edgecolor='white', lw=2)
-        
-        cntr = ax.tricontourf(t, plot_this, cmap='jet', levels=500,
-                              vmin=plot_this.min(), vmax=plot_this.max())
-        
-        fig.colorbar(cntr, ax=ax, 
-                     ticks=linspace(plot_this.min(), plot_this.max(), 10), location='bottom')
-        
-        plt.title(f'{text_TT} - Step-{stpNum}')
-        plt.gca().set_aspect('equal', adjustable='box')
-        plt.show()
-    
-
-plot_contour(plot_this=velocity, plot_on='nodes', crds=node_mat, title='Velocity', stpNum=1,
-             fill_data=fill_set_data)
-    
+gpts = get_gpts_crds(node_mat, elem_mat)
