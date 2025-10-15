@@ -5,20 +5,10 @@ Created on Sun Aug 24 13:21:00 2025
 @author: KP
 """
 
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Aug 12 17:03:19 2025
+# %% [IMPORTS]
+from impLibrary import *
 
-@author: Dell
-"""
-#%% [IMPORTS]
-from math import sqrt
-from numpy import array, zeros, ix_, dot, asarray, empty, max, arange
-from scipy.linalg import det, inv, norm
-import time, pickle, os
-
-
-#%% [FE functions]
+# %% [FE functions]
 def get_conn(elem_no, conn):
     res, = [row[1:] for row in conn if row[0] == elem_no]
     return res
@@ -44,9 +34,9 @@ def get_el_type(n_nodes):
         int_pts = 4
         a = 1/sqrt(3)
         loc =  array([[-a, -a],
-                        [-a, a],
                         [a, -a],
-                        [a, a]])
+                        [a, a],
+                        [-a, a]])
         wts =  array([1, 1, 1, 1])
     else:
         raise ValueError("Unsupported element node count")   
@@ -178,40 +168,55 @@ def define_constitutive_stiffness_matrix(emod, enu, load_state):
         
     return D_mat
 
-
 def check_convergence(error, tol):
     cnvg = False
     if error < tol:
         cnvg = True
     return cnvg
 
-def get_gpts_crds(coords):
+def get_gpts_crds(nd_mat, el_conn):
+    gpt_crds = empty([0, 2])
     for row in el_conn:
         cl_conn = [nd for nd in get_conn(row[0], el_conn) if nd != 0]
-        coords =  asarray([get_node_coord(n, node_info) for n in cl_conn], dtype=float)
+        coords =  asarray([get_node_coord(n, nd_mat) for n in cl_conn], dtype=float)
         n_nodes_elem = len(cl_conn)
+        int_pts, loc, wts = get_el_type(n_nodes_elem)
+        for i in range(int_pts):
+            xi, eta  = loc[i, :]
+            N, dN = get_shape_functions(n_nodes_elem, xi, eta)
+            gpt_crds = append(gpt_crds, [N @ coords], axis=0)
+    return gpt_crds
     
-    
-
-
 #%% Utilty functions
+def initialize_save_files(fsd, prob_name):
+    if not os.path.exists(fr'{fsd}\{prob_name}'):
+        os.makedirs(fr'{fsd}\{prob_name}')
+    
+    return DataFrame(), DataFrame(), DataFrame()
 
-def save_my_results(U, Phi, his_par, srmat, tsmat, fname):
-    folder = fname
+
+def save_my_results(u1, u2, phi, his_par, srmat, tsmat, el_data, nd_data, gpt_data, save_loc):   
+    # dumping data-pickles
+    dumps = dict(
+        [
+            ("u1", locals()["u1"]),
+            ("u2", locals()["u2"]),
+            ("srmat", locals()["srmat"]),
+            ("tsmat", locals()["tsmat"]),
+            ("nd_data", locals()["nd_data"]),
+            ("el_data", locals()["el_data"]),
+            ("gpt_data", locals()["gpt_data"]),
+            ("phi", locals()["phi"]),
+        ]
+    )
+    # Define the file path where the selected variables will be saved
+    dump_file_path = os.path.join(save_loc, 'data.pkl')
     
-    # if directory doesnot exists:
-        # make directory
-    os.makedirs(folder, exist_ok=True)
-    
-    data_obj = {f'displacement data at step-{len(tsmat)}': U,
-            f'PF variable data at step-{len(tsmat)}': Phi,
-            f'History parameter variable at step-{len(tsmat)}': his_par,
-            f'SR data at step-{len(tsmat)}': srmat,
-            f'TS data at step-{len(tsmat)}': tsmat}
-    
-    for filename, data in data_obj.items():
-        file_path = os.path.join(folder, f'{filename}.pkl')
-        pickle.dump(data, open(file_path, 'wb'))
+    # Save the selected variables to a file
+    with open(dump_file_path, "wb") as f:
+        pickle.dump(dumps, f)
+        
+    print("data saved\n")
 
 def get_gmsh_data(file_name, dim=2):
     nd_data = []
