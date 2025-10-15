@@ -8,6 +8,7 @@ Created on Tue Sep 23 12:25:12 2025
 #%% [IMPORTS]
 from file_func import *
 from impLibrary import *
+from matplotlib.patches import Polygon
 
 #%% [Contour and Mesh Plots]
 def plot_contour(**kwargs):
@@ -15,9 +16,10 @@ def plot_contour(**kwargs):
     plot_this = kwargs.get('plot_this', None)   # vector value
     plot_on = kwargs.get('plot_on', None)   # character value
     crds = kwargs.get('crds', None)         # tensor value
-    text_TT = kwargs.get('title', None)     # character value
+    text_TT = kwargs.get('text_TT', None)     # character value
     stpNum = kwargs.get('stpNum', None)     # Integer value
     fill_data = kwargs.get('fill_data', None) # tensor data
+    
     
     if plot_this is None:
         raise ValueError('No value to plot')
@@ -38,30 +40,39 @@ def plot_contour(**kwargs):
         # plot begins here
         fig, ax = plt.subplots()
         ax.axis('off')
-        
-        # Fill sets
-        if fill_data is not None:
-            # filling crack
-            crck_x = [get_node_coord(i, crds)[0] for i in fill_data[0]]
-            crck_y = [get_node_coord(i, crds)[1] for i in fill_data[0]]
-            
-            ax.fill(crck_x, crck_y, fill=True, color='white', edgecolor='white', lw=2)
-        
+    
         cntr = ax.tricontourf(t, plot_this, cmap='jet', levels=500,
                               vmin=plot_this.min(), vmax=plot_this.max())
         
-        fig.colorbar(cntr, ax=ax, 
-                     ticks=linspace(plot_this.min(), plot_this.max(), 10), location='bottom')
+        cbar = fig.colorbar(cntr, ax=ax, ticks=linspace(plot_this.min(), plot_this.max(), 5),
+                            location='right', fraction=0.046, pad=0.06)
+        cbar.ax.tick_params(direction='out', labelsize='5', width=0.2) # changes size of ticks only
+        for spine in cbar.ax.spines.values():       # changes size of cbar edge width
+            spine.set_linewidth(0.3)
+            
+        # changing the tick labels in scientific formatting
+        cbar.ax.ticklabel_format(style='sci', axis='both', scilimits=(0, 0))
+        
+        # Fill sets
+        if fill_data is not None:
+            crck_set = fill_data[0]
+            if len(crck_set) != 0:
+                crck_x = [get_node_coord(i, crds)[0] for i in crck_set]
+                crck_y = [get_node_coord(i, crds)[1] for i in crck_set]
+            
+                ax.fill(crck_x, crck_y, fill=True, color='white', edgecolor='white', lw=2)
+                
+            for _ in range(len(fill_data) - 1):
+                if len(fill_data[1+_]) != 0:
+                    xcrd = [get_node_coord(i, crds)[0] for i in fill_data[1+_]]
+                    ycrd = [get_node_coord(i, crds)[1] for i in fill_data[1+_]]
+            
+                    ax.fill(xcrd, ycrd, fill=True, color='white', edgecolor='white', lw=1, ls='-')
         
         plt.title(f'{text_TT} - Step-{stpNum}')
         plt.gca().set_aspect('equal', adjustable='box')
         plt.show()
     
-
-# plot_contour(plot_this=velocity, plot_on='nodes', crds=node_mat, title='Velocity', stpNum=1,
-#              fill_data=fill_set_data)
-
-
 def plot_mesh(el_data, nd_data, **kwargs):
     show_nodes = kwargs.get('show_nodes', None)
     show_elems = kwargs.get('show_elems', None)
@@ -109,11 +120,10 @@ def plot_mesh(el_data, nd_data, **kwargs):
             # x load -- arrow annotation towards right
             # y load -- arrow annotation towards up
             pass
-    
+    ax.set_aspect('equal')
     plt.tight_layout()
     plt.show()
   
-
 #%% [Sci charts, lineplots]
 def plot_structural_response(srmat, **kwargs):    
     # reading kwargs
@@ -149,13 +159,12 @@ def plot_structural_response(srmat, **kwargs):
     ax.plot(srmat[:, 0], srmat[:, 1], ls='-', c='black', lw=1)
     
     # legend
-    ax.legend()
+    ax.legend([])
     
     # tight_layout and show func call
     plt.tight_layout()
     plt.show()
     
-
 def plot_time_statistics(tsmat, **kwargs):
     # essentially this is a bar plot in format of (2, 1)
     fig, ax = plt.subplots(2, 1)
