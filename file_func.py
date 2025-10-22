@@ -77,17 +77,36 @@ def comp_B_global(dN, n_nodes, coords):
         B[2, 2*i+1] = dN_dx 
     return B, det_J
 
+def comp_B_phi(dN, n_nodes, coords):
+    B_phi = []
+    dN_dxi_deta = dN.T 
+    J = dN_dxi_deta @ coords
+    inv_J  = inv(J)
+    dN_dx_dy = inv_J @ dN_dxi_deta
+    B_phi = zeros((n_nodes, 2))
+    for i in range(n_nodes):
+        
+    
+
 def comp_stiffness_mat(D_mat, n_nodes, coords):
     int_pts, loc, wts = get_el_type(n_nodes)
     K_e =  zeros((2*n_nodes, 2*n_nodes))
+    K_p = zeros((n_nodes, n_nodes))
     for i in range(int_pts):
         xi, eta  = loc[i, :]
         N, dN = get_shape_functions(n_nodes, xi, eta)
         B, det_J = comp_B_global(dN, n_nodes, coords)
+        # add function to get Bphi
+        # add function to evaluate strain, stress, energy, phase-field value
+        # all evaluations must be at gauss-points
+        # add function for evaluating alpha(phi), omega(phi) and there derivatives
+        # update history parameter in global also
         
         # assembly for element
         dvol = det_J*wts[i]
-        K_e +=(B.T @ D_mat @ B)*dvol
+        K_e +=(B.T @ D_mat @ B)*dvol # update this
+        # add K_p assembly
+        
         # Kglobal[ix_(dof_map, dof_map)] += (B.T @  D_mat @ B)*dvol
         # return Kglobal
     return K_e
