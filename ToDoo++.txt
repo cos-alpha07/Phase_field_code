@@ -19,11 +19,28 @@
 
 [14 October 2025]
 
-[Nok] update ppt file
+[OK] develop/update code for Phase-field (damage only) stiffness and residual update
 
-[Nok] develop/update code for Phase-field (damage only) stiifness and residual update
+[OK] update the solver code for staggered PFM implementation
 
-[Nok] update the solver code for staggered PFM implementation
+-----------------------------------------------------
+
+[30 October 2025]
+
+[Nok] update the code for updating history parameter in global storage
+
+[Nok] create specimen specific mesh using GMSH
+        - uniaxial bar (reduced crossection)
+        - Mode-I/II sample (SEN)
+        - Winkler's Lpanel (mixed mode)
+        
+[Nok] update ppt file        
+
+[Nok] try to run codes for some brittle fracture numerical problems
+        - displacement control (**)
+        - load control
+        - langrange multiplier displacement controlled loading (optional) 
+        
 
 [Nok] create a python function that checks the convergence of the solution based on
         different user defined criteria
@@ -31,7 +48,9 @@
         - Residual error
         - damage only error
 
-[Nok] try to run codes for some brittle fracture numerical problems
-        - displacement control
-        - load control
-        - langrange multiplier displacement controlled loading (optional)     
+[Nok] code profiling - absolutely necessary, right now code processing feels slower
+
+[Nok] solve PFM brittle fracture variational formulation in your personal notebook
+
+[Nok] update the PFM formulation .docx file accordingly   
+
