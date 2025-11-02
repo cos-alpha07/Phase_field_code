@@ -1,5 +1,12 @@
 # -*- coding: utf-8 -*-
 """
+Created on Thu Oct 30 12:54:26 2025
+
+@author: Dell
+"""
+
+# -*- coding: utf-8 -*-
+"""
 Created on Thu Oct  2 16:51:54 2025
 
 @author: Dell
@@ -15,10 +22,10 @@ from impLibrary import *
 root_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 input_fileDirectory = os.path.join(root_directory, 'inpData')
 
-filename = os.path.join(input_fileDirectory, 'uniaxial_bar.inp')
+filename = os.path.join(input_fileDirectory, 'test_sample.inp')
 file_save_directory = os.path.join(root_directory,'results')
 
-probname = 'unibar_tension'
+probname = 'test_sample'
 
 elem_data, node_data, elem_count, node_count = get_gmsh_data(filename, dim=2)
 # gpt_crds
@@ -28,22 +35,23 @@ gpts_df = DataFrame(gpts_crd)
 
 #%%% material props
 nu = 0.2
-E = 3*1e4       #MPa
+E = 3e4       #MPa
 G_c = 0.008    #N/mm
 f_t = 3.0        #MPa
 l_c = 5         # mm
 thk = 1
+
 #%%% dof setting
 # fix dofs, load_dofs, pres_dofs, free_dofs
-nd_fix_u1 = array([1, 4, 166, 167, 168], dtype=int)
-nd_fix_u2 = array([i for i in node_data[:, 0]], dtype=int)
+nd_fix_u1 = array([1], dtype=int)
+nd_fix_u2 = array([2], dtype=int)
 
-nd_load_u1 = array([2, 3, 88, 89, 90], dtype=int)
-nd_load_u2 = array([], dtype=int)
+nd_load_u1 = array([], dtype=int)
+nd_load_u2 = array([5], dtype=int)
 
 fill_crack = array([], dtype=int)
-fill_set1 = array([12, 8, 7, 11], dtype=int)
-fill_set2 = array([10, 6, 5, 9], dtype=int)
+fill_set1 = array([], dtype=int)
+fill_set2 = array([], dtype=int)
 
 bc_data = [nd_fix_u1, nd_fix_u2, nd_load_u1, nd_load_u2]
 
