@@ -156,7 +156,7 @@ def assemble_forces_and_stiffness(el_conn, node_info, a_global, p_global, D_mat,
         p_e = p_global[dof_map_p]
         coords =  asarray([get_node_coord(n, node_info) for n in cl_conn], dtype=float)
         n_nodes_elem = len(cl_conn)
-        K_e, K_p, f_int_e, f_p, idx = comp_stiffness_mat_and_forces(idx, D_mat, n_nodes_elem,
+        K_e, K_p, f_int_e, f_p, idx, hist = comp_stiffness_mat_and_forces(idx, D_mat, n_nodes_elem,
                                                                     u_e, p_e, coords, hist, emod, 
                                                                     f_t, G_c, l_c, thk)
         for i, gi in enumerate(dof_map):
@@ -167,7 +167,7 @@ def assemble_forces_and_stiffness(el_conn, node_info, a_global, p_global, D_mat,
         K[ix_(dof_map, dof_map)] += K_e
         K_phi[ix_(dof_map_p, dof_map_p)] += K_p
         
-    return K, K_phi, f_int, f_phi
+    return K, K_phi, f_int, f_phi, hist
 
 def define_constitutive_stiffness_matrix(emod, enu, load_state):
     # load_state - {Plane strain, Plane stress}
