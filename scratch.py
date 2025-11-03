@@ -118,7 +118,7 @@ def comp_stiffness_mat_and_forces(idx, D_mat, n_nodes, u_e, p_e, coords, hist, e
         psi_0 = 0.5 * comp_macaulay(sigma_1, 'positive')**2/emod 
         
         hist_gpt = max(hist[idx], psi_0, 0.5*(f_t**2)/emod)
-        
+        hist[idx] = hist_gpt
         # update history parameter in the global storage vector also
         
         # assembly for element
@@ -137,7 +137,7 @@ def comp_stiffness_mat_and_forces(idx, D_mat, n_nodes, u_e, p_e, coords, hist, e
         
         idx += 1
         
-    return K_e, K_p, f_int_e, f_p, idx
+    return K_e, K_p, f_int_e, f_p, idx, hist
 
 def assemble_forces_and_stiffness(el_conn, node_info, a_global, p_global, D_mat, hist, emod, f_t, G_c, l_c, thk):
     max_node = int(amax(el_conn))
