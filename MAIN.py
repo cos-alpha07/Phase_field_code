@@ -55,7 +55,7 @@ while app_load < umax:    # loop on steps
         print(f'({stp}) load={app_load}\t Iteration - {itr}', end=', ')
         
         # build Kmat, (Fint, Fext) -> Resd
-        K_mat, K_phi, F_int, F_phi = assemble_forces_and_stiffness(elem_data, node_data, tempu, tempp, D,
+        K_mat, K_phi, F_int, F_phi, hist_param = assemble_forces_and_stiffness(elem_data, node_data, tempu, tempp, D,
                                                                    hist_param, E, f_t, G_c, l_c, thk)
         #K_disp, K_phi, F_disp, F_phi = assemble_KK_Fi(elem_data, node_data, tempu, tempp, D)
         
