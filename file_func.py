@@ -1,5 +1,12 @@
 # -*- coding: utf-8 -*-
 """
+Spyder Editor
+
+This is a temporary script file.
+"""
+
+# -*- coding: utf-8 -*-
+"""
 Created on Sun Aug 24 13:21:00 2025
 
 @author: KP
@@ -9,8 +16,9 @@ Created on Sun Aug 24 13:21:00 2025
 from impLibrary import *
 
 # %% [FE functions]
+
 def get_conn(elem_no, conn):
-    res, = [row[1:] for row in conn if row[0] == elem_no]
+    res = conn[elem_no - 1][1:]
     return res
 
 def get_el_num(nodal_con, elcon):
@@ -18,7 +26,7 @@ def get_el_num(nodal_con, elcon):
     return res
 
 def get_node_coord(node_num, node_info):
-    res, = [row[1:] for row in node_info if row[0] == node_num]
+    res = node_info[node_num - 1][1:]
     return res
 
 def get_node_no(node_coord, node_info):
@@ -59,114 +67,108 @@ def get_shape_functions(n_nodes, xi, eta):
         raise ValueError("Unsupported element node count")      
     return N, dN
          
-def comp_B_global(dN, n_nodes, coords):
+def comp_B_global(k, dN, n_nodes, coords, el_data):
     dN_dxi_deta = dN.T
     J = dN_dxi_deta @ coords
     det_J =   det(J)
-    if det_J <= 0:    
-        raise ValueError("Non-positive Jacobian determinant: detJ = %g" % det_J)
+    if det_J <= 0:     
+        raise ValueError(f"Non-positive Jacobian determinant: detJ = %g, with elem_no - {k+1}" % det_J)
     inv_J  =   inv(J)
-    dN_dx_dy = inv_J @ dN_dxi_deta
+    B_phi = inv_J @ dN_dxi_deta     #2x4
     B =  zeros((3, 2*n_nodes))
     for i in range(n_nodes):
-        dN_dx = dN_dx_dy[0,i]
-        dN_dy = dN_dx_dy[1,i]
+        dN_dx = B_phi[0,i]
+        dN_dy = B_phi[1,i]
         B[0, 2*i] = dN_dx
         B[1, 2*i+1] = dN_dy
         B[2, 2*i] = dN_dy
         B[2, 2*i+1] = dN_dx 
-    return B, det_J
-
-def comp_B_phi(dN, n_nodes, coords):
-    B_phi = []
-    dN_dxi_deta = dN.T 
-    J = dN_dxi_deta @ coords
-    inv_J  = inv(J)
-    dN_dx_dy = inv_J @ dN_dxi_deta
-    B_phi = zeros((n_nodes, 2))
-    for i in range(n_nodes):
-        
-    
-
-def comp_stiffness_mat(D_mat, n_nodes, coords):
+    return B, B_phi, det_J
+       
+def comp_stiffness_mat_and_forces(idx, D_mat, n_nodes, u_e, p_e, coords, hist, emod, f_t, G_c, 
+                                  l_c, thk, el_data, gpts):
     int_pts, loc, wts = get_el_type(n_nodes)
     K_e =  zeros((2*n_nodes, 2*n_nodes))
     K_p = zeros((n_nodes, n_nodes))
+    f_int_e =  zeros(2*n_nodes)
+    f_p = zeros(n_nodes)
+    c_o = pi
     for i in range(int_pts):
         xi, eta  = loc[i, :]
         N, dN = get_shape_functions(n_nodes, xi, eta)
-        B, det_J = comp_B_global(dN, n_nodes, coords)
         # add function to get Bphi
+        B, B_phi, det_J = comp_B_global(idx, dN, n_nodes, coords, el_data)
         # add function to evaluate strain, stress, energy, phase-field value
-        # all evaluations must be at gauss-points
+        phi = N @ p_e
+        phi_grad = B_phi @ p_e.T    #2x1
         # add function for evaluating alpha(phi), omega(phi) and there derivatives
-        # update history parameter in global also
+        al_phi, al_phi_d, al_phi_dd, om_phi, om_phi_d, om_phi_dd = comp_phase_field_vars(phi, emod, f_t, G_c,
+                                                                                         l_c, 'concrete')
+        strain = B @ u_e                  
+        stres = D_mat @ strain           
+        sigma_1 = max(eigvals([[stres[0], stres[2]],
+                         [stres[2], stres[1]]]).real)
+        
+        psi_0 = 0.5 * comp_macaulay(sigma_1, 'positive')**2/emod 
+        
+        hist_gpt = max(hist[idx], psi_0, 0.5*(f_t**2)/emod)
+
+        hist[idx] = hist_gpt
+        # update history parameter in the global storage vector also
+        
+        # updating gpt_crds
+        gpts[idx, :] = N @ coords
         
         # assembly for element
-        dvol = det_J*wts[i]
-        K_e +=(B.T @ D_mat @ B)*dvol # update this
-        # add K_p assembly
+        dvol = det_J*wts[i]*thk
+        K_e +=  om_phi*(B.T @ D_mat @ B)*dvol # update this
         
-        # Kglobal[ix_(dof_map, dof_map)] += (B.T @  D_mat @ B)*dvol
-        # return Kglobal
-    return K_e
+        K_p += ((al_phi_dd * G_c/(l_c*c_o)) + om_phi_dd * hist_gpt)*N[:, newaxis] @ N[newaxis, :]*dvol 
+        K_p += 2*G_c*l_c/c_o * B_phi.T @ B_phi*dvol
+        
+        f_int_e += om_phi*(B.T @ stres)*dvol
+        
+        f_p += (om_phi_d * hist_gpt + al_phi_d*G_c/(l_c*c_o))*N*dvol
+        f_p += 2*G_c*l_c/c_o * B_phi.T @ phi_grad*dvol
+        
+        idx += 1
+        
+    return K_e, K_p, f_int_e, f_p, idx, hist
 
-def assemble_stiffnes_mat(el_conn, node_info, D_mat):
-    max_node = int(max(el_conn))
+def assemble_forces_and_stiffness(el_conn, node_info, a_global, p_global, D_mat, hist,
+                                  emod, f_t, G_c, l_c, thk, gpts):
+    max_node = int(amax(el_conn))
     n_dof = 2 * int(max_node)
-    K  =  zeros((n_dof, n_dof))
-    for row in el_conn:
-        cl_conn = [nd for nd in get_conn(row[0], el_conn) if nd != 0]
-        coords =  asarray([get_node_coord(n, node_info) for n in cl_conn], dtype=float)
-        n_nodes_elem = len(cl_conn)
-        K_e = comp_stiffness_mat(D_mat, n_nodes_elem, coords)
-        dof_map = []
-        for node in cl_conn:
-            dof_u = 2*(node-1)
-            dof_v = 2*node-1
-            dof_map.append(dof_u)
-            dof_map.append(dof_v)
-            
-        K[ix_(dof_map, dof_map)] += K_e
-    return K
-
-def comp_fint(n_nodes, coords, u_e, D_mat):
-    int_pts, loc, wts = get_el_type(n_nodes)
-    f_int_e =  zeros(2*n_nodes)
-    for i in range(int_pts):
-        xi, eta = loc[i,0], loc[i,1]
-        _, dN = get_shape_functions(n_nodes, xi, eta)
-        B, det_J = comp_B_global(dN, n_nodes, coords)
-        stres = D_mat @ (B @ u_e)
-        f_int_e += (B.T @ stres)*det_J*wts[i]
-    return f_int_e
-
-def assemble_fint(el_conn, node_info, a_global, D_mat):
-    max_node = int(max(el_conn))
-    n_dof = 2 * int(max_node)
-    f_int =  zeros(n_dof)
+    f_int = zeros(n_dof)
+    f_phi = zeros(max_node)
+    K = zeros((n_dof, n_dof))
+    K_phi = zeros((max_node, max_node))
+    
+    idx = 0
     for row in el_conn:
         conn = get_conn(row[0], el_conn)
         cl_conn = [nd for nd in conn if nd != 0]
         dof_map = [dof for n in cl_conn for dof in (2*(n-1), 2*(n-1)+1)]
+        dof_map_p = [n - 1 for n in cl_conn]
         u_e = a_global[dof_map]
+        p_e = p_global[dof_map_p]
         coords =  asarray([get_node_coord(n, node_info) for n in cl_conn], dtype=float)
         n_nodes_elem = len(cl_conn)
-        f_int_e = comp_fint(n_nodes_elem, coords, u_e, D_mat)
+        K_e, K_p, f_int_e, f_p, idx, hist = comp_stiffness_mat_and_forces(idx, D_mat, n_nodes_elem,
+                                                                    u_e, p_e, coords, hist, emod, 
+                                                                    f_t, G_c, l_c, thk, el_conn, gpts)
         for i, gi in enumerate(dof_map):
-            f_int[gi] += f_int_e[i]         
-    return f_int
-
-
-def assemble_KK_Fi(el_data, nd_data, tempu, D_mat):
-    K_mat = assemble_stiffnes_mat(el_data, nd_data, D_mat)
-    F_int = assemble_fint(el_data, nd_data, tempu, D_mat)
-    return K_mat, F_int
-
+            f_int[gi] += f_int_e[i]
+        for j, gj in enumerate(dof_map_p):
+            f_phi[gj] += f_p[j]
+            
+        K[ix_(dof_map, dof_map)] += K_e
+        K_phi[ix_(dof_map_p, dof_map_p)] += K_p
+        
+    return K, K_phi, f_int, f_phi, hist
 
 def define_constitutive_stiffness_matrix(emod, enu, load_state):
     # load_state - {Plane strain, Plane stress}
-    
     D_mat = zeros((3, 3))
     
     if load_state.upper() in ('PLANE STRAIN', 'PLANE_STRAIN'):
@@ -204,8 +206,59 @@ def get_gpts_crds(nd_mat, el_conn):
             xi, eta  = loc[i, :]
             N, dN = get_shape_functions(n_nodes_elem, xi, eta)
             gpt_crds = append(gpt_crds, [N @ coords], axis=0)
+            
     return gpt_crds
+
+def init_gpt_mat(el_mat):
+    t3_ipt, q4_ipt = 1, 4
+    num_t3_elems = len(el_mat[el_mat[:, -1] == 0])             
+    num_q4_elems = len(el_mat - num_t3_elems)
     
+    return zeros([t3_ipt*num_t3_elems + q4_ipt*num_q4_elems, 2])
+
+def comp_phase_field_vars(dmg, emod, f_t, G_c, l_c, soft_type):
+    l_ch = emod*G_c/f_t**2
+    a1 = 4*l_ch/(pi*l_c)
+    
+    if soft_type.upper() == 'LINEAR':
+        a2, a3, p = -0.5, 0, 2
+    elif soft_type.upper() == 'CONCRETE':
+        a2, a3, p = 1.3868, 0.6567, 2
+        
+    phi = dmg
+    alpha_phi = 2*phi - phi**2
+    alpha_phi_d = 2 - 2*phi
+    alpha_phi_dd = -2
+    
+    omega_phi = (1-phi)**p/((1-phi)**p + a1*phi*(1 + a2*phi + a2*a3*phi**2))
+    omega_phi_d = ((1-phi)**(p-1) * (a1*(phi-1) * (a2*a3*phi**2+ a2*phi*(2*a3*phi+1)+ a2*phi+1)
+    + p*(1 - phi)**p - p*(a1*phi*(a2*a3*phi**2 + a2*phi+1) + (1-phi)**p)) / (a1*phi*(a2*a3*phi**2 + a2*phi+1)
+                                                                                       + (1-phi)**p)**2)
+    
+    omega_phi_dd = ((1 - phi)**p * (p*(p - 1)/(phi - 1)**2- 2*p*(a1*a2*phi*(2*a3*phi + 1)+ a1*(a2*a3*phi**2 + a2*phi + 1)
+            + p*(1 - phi)**p/(phi - 1)) / ((phi - 1) * (a1*phi*(a2*a3*phi**2 + a2*phi + 1) + (1 - phi)**p))
+        - (2*a1*a2*a3*phi+ 2*a1*a2*(2*a3*phi + 1)+ p**2*(1 - phi)**p/(phi - 1)**2- p*(1 - phi)**p/(phi - 1)**2
+            - 2*(a1*a2*phi*(2*a3*phi + 1)+ a1*(a2*a3*phi**2 + a2*phi + 1)+ p*(1 - phi)**p/(phi - 1))**2 
+            / (a1*phi*(a2*a3*phi**2 + a2*phi + 1) + (1 - phi)**p)) / (a1*phi*(a2*a3*phi**2 + a2*phi + 1) + (1 - phi)**p)) 
+                    / (a1*phi*(a2*a3*phi**2 + a2*phi + 1) + (1 - phi)**p))
+
+    
+    # ret_res = [alpha_phi.evalf(subs={phi:dmg}), alpha_phi_d.evalf(subs={phi:dmg}), 
+    #            alpha_phi_dd.evalf(subs={phi:dmg}), omega_phi.evalf(subs={phi:dmg}), 
+    #            omega_phi_d.evalf(subs={phi:dmg}), omega_phi_dd.evalf(subs={phi:dmg})]
+    
+    ret_res = [alpha_phi, alpha_phi_d, alpha_phi_dd, omega_phi, omega_phi_d, omega_phi_dd]
+
+    return [float(_) for _ in ret_res]
+    
+def comp_macaulay(val, part):
+    if part.upper() == 'POSITIVE':
+        return (val + abs(val))/2
+    elif part.upper() == 'NEGATIVE':
+        return (abs(val) - val)/2
+    else:
+        return (val + abs(val))/2
+          
 #%% Utilty functions
 def initialize_save_files(fsd, prob_name):
     if not os.path.exists(fr'{fsd}\{prob_name}'):
@@ -249,9 +302,9 @@ def get_gmsh_data(file_name, dim=2):
 
     # reading node data
     for i, l in enumerate(line):
-        if '*NODE' in l:
+        if l.startswith('*NODE'):
             nd_idxs.append(i+1)
-        elif '*ELEMENT' in l:
+        elif l.startswith('*ELEMENT'):
             nd_idxs.append(i-1)
             break
 
@@ -261,14 +314,83 @@ def get_gmsh_data(file_name, dim=2):
 
     # reading element data
     for i, l in enumerate(line):
-        if 'ELSET=Surface1' in l:
-            el_idxs.append(i+1)
+        if l.startswith('*ELEMENT'):
+            if 'Surface' in l:
+                el_idxs.append(i+1)
 
     for l in line[el_idxs[0]:]:
-        if l.startswith('*'):
+        if l.startswith('*ELSET') or l.startswith('*NSET'):
             break
-        el_data.append(l.split(', '))
+        elif l.startswith('*'):
+            continue
+
+        if len(l.split(', ')) == 4:
+            el_data.append(l.split(', ') + ['0'])
+        else:
+            el_data.append(l.split(', '))
+
     el_data = array(el_data, dtype=int)
     el_data[:, 0] = arange(1, len(el_data)+1, 1, dtype=int)
 
     return el_data, nd_data[:, 0:dim+1], len(el_data), len(nd_data)
+
+def get_abaqus_data(file_name):
+    '''
+    # Function to read node_data, elem_data from abaus input file
+    # Arguments : file_name
+    # returns : el_data, nd_data, len(el_data), len(nd_data)
+    '''
+    nd_data = []
+    el_data = []
+    read_index = []
+
+    with open(file_name, 'r') as file:
+        line = file.readlines()
+        for i, l in enumerate(line):
+            if '*Node' in l:
+                read_index.append(i + 1)
+            if '*Element' in l:
+                read_index.append(i)
+                read_index.append(i + 1)
+            if '*Nset' in l:
+                read_index.append(i)
+                break
+
+        for l in line[read_index[0]: read_index[1]]:
+            nd_data.append(l.split(', '))
+        nd_data = array(nd_data, dtype=float)
+        num_elTypes = (len(read_index) - 2) / 2
+        elSets = []
+        cnt = 0
+        while cnt <= num_elTypes:
+            elSets.append([read_index[2 + cnt], read_index[2 + cnt + 1]])
+            cnt += 2
+
+        for tp in elSets:
+            for l in line[tp[0]: tp[1]]:
+                el_data.append(l.split(', '))
+
+        cols = max([len(e) for e in el_data])
+        el_data = [e + ['0'] * (cols - len(e)) for e in el_data]
+        el_data = array(el_data, dtype=int)
+
+    return el_data, nd_data, len(el_data), len(nd_data)
+
+def flip_elems(el_con, node_mat):   
+    el_conn = el_con.copy()
+    for elems in el_con:
+    # cl_conn = [nd for nd in get_conn(elems[0], el_con) if nd != 0]
+        if cross(node_mat[elems[1]-1][1:], node_mat[elems[2]-1][1:]) <= 0 and cross(node_mat[elems[2]-1][1:], 
+                                                                                node_mat[elems[3]-1][1:]) <0:
+            if 0 in elems:
+                j, n1, n2, n3, n4 = elems
+                el_conn[j-1] = [j, n1, n3, n2, n4]
+                print(f"Flipped element {j} ccw")
+            
+            else:
+                j, n1, n2, n3, n4 = elems
+                el_conn[j-1] =  [j, n3, n2, n1, n4]
+                print(f"Flipped element {j} ccw")
+            
+    return el_conn
+
