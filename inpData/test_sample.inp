@@ -1,0 +1,31 @@
+*Heading
+ H:\kp\Gmsh_samples\test_sample\test_sample.inp
+*NODE
+1, -0, 0, 0
+2, 0.01, 0, 0
+3, 0.01, 0.01, 0
+4, 0, 0.01, 0
+5, 0.005, 0.015, 0
+******* E L E M E N T S *************
+*ELEMENT, type=T3D2, ELSET=Line1
+6, 1, 2
+*ELEMENT, type=T3D2, ELSET=Line2
+7, 2, 3
+*ELEMENT, type=T3D2, ELSET=Line3
+8, 3, 4
+*ELEMENT, type=T3D2, ELSET=Line4
+9, 4, 1
+*ELEMENT, type=T3D2, ELSET=Line5
+10, 4, 5
+*ELEMENT, type=T3D2, ELSET=Line6
+11, 5, 3
+*ELEMENT, type=CPS3, ELSET=Surface1
+12, 4, 3, 5
+*ELEMENT, type=CPS4, ELSET=Surface1
+13, 1, 2, 3, 4
+*NSET,NSET=x_fixed
+1, 
+*NSET,NSET=y_fixed
+2, 
+*NSET,NSET=y_load
+5, 
