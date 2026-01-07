@@ -13,7 +13,7 @@ Created on Thu Oct  2 16:51:54 2025
 """
 
 #%% imports
-from scratch import *
+from file_func import *
 from Plotting_file import *
 from impLibrary import *
 
@@ -23,9 +23,9 @@ root_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 input_fileDirectory = os.path.join(root_directory, 'inpData')
 
 filename = os.path.join(input_fileDirectory, 'test_sample.inp')
-file_save_directory = os.path.join(root_directory,'results')
+file_save_directory = os.path.join(root_directory,'results', 'test_sample')
+fixed_date = datetime.today().strftime('%d-%m-%Y')
 
-probname = 'test_sample'
 
 elem_data, node_data, elem_count, node_count = get_gmsh_data(filename, dim=2)
 # gpt_crds
@@ -75,6 +75,8 @@ fdofs = [i for i in total_disp_dofs if i not in pdofs]
 
 load_type = 'disp'
 umax = 0.02
-num_steps = 100
-u_step = 0.0002
-tol = 1e-4
+ustep = 0.0002
+num_steps = int(umax/ustep)
+tol = 1e-5
+
+probname = fixed_date + f'__lc={l_c}'

@@ -15,29 +15,26 @@ from impLibrary import *
 root_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 input_fileDirectory = os.path.join(root_directory, 'inpData')
 
-filename = os.path.abspath(input_fileDirectory, 'L_shaped_panel.inp')
-file_save_directory = os.path.join(root_directory,'results')
+filename = os.path.join(input_fileDirectory, 'Lpanel_testing.inp')
+file_save_directory = os.path.join(root_directory,'results', 'L_shaped_panel')
+fixed_date = datetime.today().strftime('%d-%m-%Y')
 
-el_data, nd_data, _, _ = get_gmsh_data(filename, dim=2)
-plot_mesh(el_data, nd_data)
-
-probname = 'L shaped panel'
-
-el_data, nd_data, elem_count, node_count = get_gmsh_data(filename, dim=2)
-plot_mesh(el_data, nd_data)
+elem_data, node_data, elem_count, node_count = get_gmsh_data(filename, dim=2)
 # gpt_crds
-gpts_crd = get_gpts_crds(node_data, elem_data)
-# make gpt_df 
-gpts_df = DataFrame(gpts_crd)
+gpts_crd = init_gpt_mat(elem_data)
 
 #%%% material props
 nu = 0.18
 E = 2.585*1e4
+f_t = 2.7
+G_c = 0.09
+thk = 100
+l_c = 10
 
 #%%% dof setting
 # fix dofs, load_dofs, pres_dofs, free_dofs
-nd_fix_u1 = array([26, 27, 28, 29, 30, 31, 32, 33, 34], dtype=int)
-nd_fix_u2 = array([26, 27, 28, 29, 30, 31, 32, 33, 34], dtype=int)
+nd_fix_u1 = array([1, 2, 8, 9, 10, 11, 12, 13, 14, 15, 16], dtype=int)
+nd_fix_u2 = array([1, 2, 8, 9, 10, 11, 12, 13, 14, 15, 16], dtype=int)
 
 nd_load_u1 = array([], dtype=int)
 nd_load_u2 = array([7], dtype=int)
@@ -65,7 +62,9 @@ fdofs = [i for i in total_disp_dofs if i not in pdofs]
     # - load_max, load_step, tolerance
     
 load_type = 'disp'    
-umax = 0.006
-num_steps = 60
-u_step = 1e-4
+umax = 1
+ustep = 0.005
+num_steps = int(umax/ustep)
 tol = 1e-6
+
+probname = fixed_date + f'__lc={l_c}'

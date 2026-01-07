@@ -6,7 +6,7 @@ Created on Thu Oct  2 16:51:54 2025
 """
 
 #%% imports
-from scratch import *
+from file_func import *
 from Plotting_file import *
 from impLibrary import *
 
@@ -16,9 +16,8 @@ root_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 input_fileDirectory = os.path.join(root_directory, 'inpData')
 
 filename = os.path.join(input_fileDirectory, 'uniaxial_bar.inp')
-file_save_directory = os.path.join(root_directory,'results')
-
-probname = 'unibar_tension'
+file_save_directory = os.path.join(root_directory,'results', 'unibar_tension')
+fixed_date = datetime.today().strftime('%d-%m-%Y')
 
 elem_data, node_data, elem_count, node_count = get_gmsh_data(filename, dim=2)
 # gpt_crds
@@ -32,13 +31,14 @@ E = 3*1e4       #MPa
 G_c = 0.008    #N/mm
 f_t = 3.0        #MPa
 l_c = 5         # mm
-thk = 1
+thk = 1       # mm
+
 #%%% dof setting
 # fix dofs, load_dofs, pres_dofs, free_dofs
-nd_fix_u1 = array([1, 4, 166, 167, 168], dtype=int)
-nd_fix_u2 = array([i for i in node_data[:, 0]], dtype=int)
+nd_fix_u1 = array([1, 4, 120], dtype=int)
+nd_fix_u2 = array([int(i) for i in node_data[:, 0]], dtype=int)
 
-nd_load_u1 = array([2, 3, 88, 89, 90], dtype=int)
+nd_load_u1 = array([2, 3, 66], dtype=int)
 nd_load_u2 = array([], dtype=int)
 
 fill_crack = array([], dtype=int)
@@ -67,6 +67,8 @@ fdofs = [i for i in total_disp_dofs if i not in pdofs]
 
 load_type = 'disp'
 umax = 0.02
-num_steps = 100
-u_step = 0.0002
-tol = 1e-4
+ustep = 1e-3
+num_steps = int(umax/ustep)
+tol = 1e-5
+
+probname = fixed_date + f'__lc={l_c}'
