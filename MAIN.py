@@ -6,7 +6,7 @@ Created on Tue Sep  2 22:40:53 2025
 """
 
 #%% imports
-from specimen_files.unibar_redXs import *
+from specimen_files.single_edge_crck import *
 
 #%% material props
 D = define_constitutive_stiffness_matrix(E, nu, 'PLANE_STRAIN')
@@ -24,7 +24,7 @@ u1_df, u2_df, phi_df = initialize_save_files(file_save_directory, probname)
 mesh_display = False
 if mesh_display:
     mdt = time.process_time()
-    plot_mesh(elem_data, node_data)
+    plot_mesh(elem_data, node_data, show_nodes=False, show_bcs=True, bc_nodes=bc_data)
     print(f'Mesh Plotted, time - {time.process_time() - mdt}')
     
 #%% Solver
@@ -33,11 +33,16 @@ stp = 0
 SR_mat = zeros([1, 2]) 
 TS_mat = empty([0, 3])
 
+
 #%%% NR begins
 while app_load < umax:    # loop on steps
     dU[:] = 0.0
     dPhi[:] = 0.0
-    app_load += u_step
+    
+    # add code to manipulate ustep for alleviating convergence issues
+    # if app_load > 0.004:
+    #     ustep = 1e-4
+    app_load += ustep
     
     stp += 1
     print(f'Running load-step - {stp}')
@@ -52,32 +57,27 @@ while app_load < umax:    # loop on steps
     # loop for iterations
     while err_ > tol:
         itr += 1
-        print(f'({stp}) load={app_load}\t Iteration - {itr}', end=', ')
+        print(f'({stp}) load={app_load:}\t Itr-{itr}', end=', ')
         
         # build Kmat, (Fint, Fext) -> Resd
-        K_mat, K_phi, F_int, F_phi, hist_param = assemble_forces_and_stiffness(elem_data, node_data, tempu, tempp, D,
-                                                                   hist_param, E, f_t, G_c, l_c, thk)
-        #K_disp, K_phi, F_disp, F_phi = assemble_KK_Fi(elem_data, node_data, tempu, tempp, D)
-        
-        # [DISP]
-        
+        K_mat, K_phi, F_int, F_phi, hist_param = assemble_forces_and_stiffness(elem_data, node_data, tempu, tempp,
+                                                                 D, hist_param, E, f_t,  G_c, l_c, thk, gpts_crd)
+               
         # applying boundary conditions
         K_ff = K_mat[ix_(fdofs, fdofs)]
         K_fp = K_mat[ix_(fdofs, pdofs)]
-        
-        dU[load_dofs] = app_load
-        
+                  
         if itr == 1:
+            dU[load_dofs] = ustep
             rhs = -(K_fp @ dU[pdofs] + F_int[fdofs])
             
         else:
             rhs = -F_int[fdofs]
             dU[pdofs] = 0 
            
-        dU[fdofs] = solve(K_ff, rhs)
+        dU[fdofs] = spsolve(csc_matrix(K_ff), rhs)
         
         # adding dU to tempu += dU
-        tempu[load_dofs] = 0
         tempu += dU
         
         # [PHI]
@@ -110,14 +110,21 @@ while app_load < umax:    # loop on steps
     save_my_results(u1_df, u2_df, phi_df, zeros(2), SR_mat, TS_mat, elem_data, node_data, zeros([2, 4]),
                     save_loc=fr'{file_save_directory}\{probname}')
 
-sys.exit()
+#sys.exit()
 
 #%% Intermittent Plotting
+# displacement - X
 plot_contour(plot_this=Ug[[2*i for i in range(node_count)]], plot_on='nodes', crds=node_data, text_TT='U1',
-             stpNum=stp, fill_data=fill_data)
+            stpNum=stp, fill_data=fill_data)
+# displacement - Y
+plot_contour(plot_this=Ug[[2*i + 1 for i in range(node_count)]], plot_on='nodes', crds=node_data, text_TT='U2',
+            stpNum=stp, fill_data=fill_data)
+# damage
+plot_contour(plot_this=Phig, plot_on='nodes', crds=node_data, text_TT='Damage',
+            stpNum=stp, fill_data=fill_data)
 
-    
-    
-    
+
+     
+
 
 
